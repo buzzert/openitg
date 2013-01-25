@@ -39,6 +39,8 @@ void OptionsCursor::Set( PlayerNumber pn )
 	m_sprLeft.SetState(   iBaseFrameNo+0 );
 	m_sprMiddle.SetState( iBaseFrameNo+1 );
 	m_sprRight.SetState(  iBaseFrameNo+2 );
+	
+	SetName(ssprintf("CursorP%d", pn + 1));
 }
 
 void OptionsCursor::StopTweening()
