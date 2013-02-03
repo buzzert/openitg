@@ -11,7 +11,7 @@ AM_CFLAGS =
 
 # Relax inlining; the default of 600 takes way too long to compile and
 # generates enormous output.
-AM_CXXFLAGS += -finline-limit=300
+AM_CXXFLAGS += -finline-limit=300 -g
 
 AM_CXXFLAGS += $(XCFLAGS) -I$(srcdir)/libtomcrypt/src/headers -I$(srcdir)/libtommath
 
@@ -397,7 +397,10 @@ StatsManager.cpp StatsManager.h \
 ThemeManager.cpp ThemeManager.h \
 UnlockManager.cpp UnlockManager.h \
 UserPackManager.cpp UserPackManager.h \
-ProductInfo.cpp ProductInfo.h
+ProductInfo.cpp ProductInfo.h \
+NetworkProfileManager.cpp NetworkProfileManager.h
+
+LIBS += -lcurl
 
 if !WITHOUT_NETWORKING
 # Compile NetworkSyncManager even if networking is disabled; it'll stub itself.

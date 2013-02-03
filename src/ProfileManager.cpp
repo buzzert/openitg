@@ -9,6 +9,7 @@
 #include "Steps.h"
 #include "MemoryCardManager.h"
 #include "Style.h"
+#include "NetworkProfileManager.h"
 
 /* GUID generation for arcade */
 #include "DiagnosticsUtil.h"
@@ -243,6 +244,13 @@ Profile::LoadResult ProfileManager::LoadEditableDataFromMemoryCard( PlayerNumber
 	// fall-through for a bad condition
 	return lr;
 }
+
+bool ProfileManager::LoadProfileFromNetwork( PlayerNumber pn )
+{
+	LOG->Info("*** LOADING PROFILE FROM NETPROFMAN!");
+	NETPROFMAN->LoadProfileForPlayerNumber(pn, m_Profile[pn]);
+	return true; // idk wut
+}
 			
 bool ProfileManager::LoadFirstAvailableProfile( PlayerNumber pn )
 {
@@ -250,6 +258,9 @@ bool ProfileManager::LoadFirstAvailableProfile( PlayerNumber pn )
 		return true;
 
 	if( LoadLocalProfileFromMachine(pn) )
+		return true;
+	
+	if ( LoadProfileFromNetwork(pn) )
 		return true;
 	
 	return false;
@@ -317,7 +328,7 @@ void ProfileManager::UnloadProfile( PlayerNumber pn )
 const Profile* ProfileManager::GetProfile( PlayerNumber pn ) const
 {
 	ASSERT( pn >= 0 && pn<NUM_PLAYERS );
-
+	
 	return &m_Profile[pn];
 }
 

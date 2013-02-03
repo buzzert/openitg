@@ -153,6 +153,7 @@ CString ScreenSystemLayer::GetCreditsMessage( PlayerNumber pn ) const
 		
 	if( !bShowCreditsMessage )
 	{
+		// TODO: Make this work with either MEMCARDMAN or NETPROFMAN!
 		MemoryCardState mcs = MEMCARDMAN->GetCardState( pn );
 		const Profile* pProfile = PROFILEMAN->GetProfile( pn );
 		switch( mcs )

@@ -58,6 +58,7 @@
 #include "NetworkSyncManager.h"
 #include "StatsManager.h"
 #include "UserPackManager.h"
+#include "NetworkProfileManager.h"
 
 // XXX: for I/O error reports
 #if !defined(XBOX)
@@ -1161,6 +1162,7 @@ int main(int argc, char* argv[])
 	PROFILEMAN	= new ProfileManager;
 	PROFILEMAN->Init();				// must load after SONGMAN
 	UNLOCKMAN	= new UnlockManager;
+	NETPROFMAN  = new NetworkProfileManager;
 
 
 	{
@@ -1601,6 +1603,7 @@ static void GameLoop()
 		SCREENMAN->Update( fDeltaTime );
 		MEMCARDMAN->Update();
 		NSMAN->Update( fDeltaTime );
+		NETPROFMAN->Update();
 
 		/* Important:  Process input AFTER updating game logic, or input will be acting on song beat from last frame */
 		HandleInputEvents( fDeltaTime );

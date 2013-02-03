@@ -29,6 +29,7 @@ public:
 	bool LoadFirstAvailableProfile( PlayerNumber pn );	// memory card or local profile
 	bool LoadLocalProfileFromMachine( PlayerNumber pn );
 	bool LoadProfileFromMemoryCard( PlayerNumber pn );
+	bool LoadProfileFromNetwork( PlayerNumber pn );
 	Profile::LoadResult LoadEditableDataFromMemoryCard( PlayerNumber pn, Profile *pProfile );
 	bool FastLoadProfileNameFromMemoryCard( CString sRootDir, CString &sName ) const;
 	void SaveAllProfiles() const;
@@ -49,7 +50,7 @@ public:
 	void LoadMachineProfile();
 	void SaveMachineProfile() const;
 
-	bool IsPersistentProfile( PlayerNumber pn ) const { return !m_sProfileDir[pn].empty(); }
+	bool IsPersistentProfile( PlayerNumber pn ) const { return true; /* return !m_sProfileDir[pn].empty(); */ } // this needs to return true for network profiles!
 	bool IsPersistentProfile( ProfileSlot slot ) const;
 
 	// return a profile even if !IsUsingProfile
