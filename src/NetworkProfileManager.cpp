@@ -49,15 +49,41 @@ typedef enum {
 	NetRequestTypeUploadProfile
 } NetworkingRequestType;
 
+typedef enum {
+	NetResponseTypeProfile,
+	NetResponseTypeError
+} NetworkingResponseType;
+
 class NetworkingRequest
 {
 public:
-	NetworkingRequest( NetworkingRequestType type, PlayerNumber pn, void *context ) :
-		m_eType( type ), m_pn( pn ), m_pContext( context ) {};
+	NetworkingRequest( NetworkingRequestType type, PlayerNumber pn, void *requestData ) :
+		m_eRequestType( type ), m_pn( pn ), m_pRequestData( requestData ) {};
 
-	NetworkingRequestType m_eType;
+	PlayerNumber GetPlayerNumber() const { return m_pn; };
+
+	NetworkingRequestType GetRequestType() const { return m_eRequestType; };
+	void SetRequestType( NetworkingRequestType t ) { m_eRequestType = t; };
+
+	void* GetRequestData() const { return m_pRequestData; };
+	void SetRequestData( void *requestData ) { m_pRequestData = requestData; };
+
+	void* GetResponseData() const { return m_pResponseData; };
+	NetworkingResponseType GetResponseType() const { return m_eResponseType; };
+
+private:
+	void SetResponseData( void *responseData ) { m_pResponseData = responseData; };
+	void SetResponseType( NetworkingResponseType t ) { m_eResponseType = t; };
+
+	NetworkingRequestType m_eRequestType;
+	NetworkingResponseType m_eResponseType;
+
 	PlayerNumber m_pn;
-	void *m_pContext;
+
+	void *m_pRequestData;
+	void *m_pResponseData;
+
+	friend class NetworkProfileManagerThreads::NetworkingThread;
 };
 
 namespace NetworkProfileManagerThreads {
@@ -187,11 +213,13 @@ namespace NetworkProfileManagerThreads {
 			NetworkingRequest request = m_qPendingRequests.front();
 			m_qPendingRequests.pop();
 
-			if ( request.m_eType == NetRequestTypeDownloadProfile )
+			if ( request.GetRequestType() == NetRequestTypeDownloadProfile )
 			{
-				NetworkPass *pass = (NetworkPass *)request.m_pContext;
+				NetworkPass *pass = (NetworkPass *)request.GetRequestData();
+
 				Profile *profile = DownloadProfile( pass );
-				request.m_pContext = profile;
+				request.SetResponseData( profile );
+				request.SetResponseType( NetResponseTypeProfile );
 
 				CompletedRequestsMutex.Lock();
 				m_qCompletedRequests.push( request );
@@ -276,8 +304,6 @@ void NetworkProfileManager::ProcessNetworkPasses()
 				NetworkingRequest request( NetRequestTypeDownloadProfile, p, newPass );
 				m_pNetworkThread->AddNetworkRequest( request );
 
-				NPMLog( "Added network request" );
-
 				m_State[p] = NETWORK_PASS_DOWNLOADING;
 				SCREENMAN->RefreshCreditsMessages();
 			}
@@ -299,11 +325,11 @@ void NetworkProfileManager::ProcessDownloadedProfiles()
 			NetworkingRequest request = qCompletedRequests.front();
 			qCompletedRequests.pop();
 
-			if ( request.m_eType == NetRequestTypeDownloadProfile )
+			if ( request.GetResponseType() == NetResponseTypeProfile )
 			{
-				PlayerNumber pn = request.m_pn;
+				PlayerNumber pn = request.GetPlayerNumber();
 
-				m_DownloadedProfiles[pn] = (Profile *)request.m_pContext;
+				m_DownloadedProfiles[pn] = (Profile *)request.GetResponseData();
 				m_State[pn] = NETWORK_PASS_READY;
 
 				SCREENMAN->RefreshCreditsMessages();
@@ -334,24 +360,4 @@ bool NetworkProfileManager::LoadProfileForPlayerNumber( PlayerNumber pn, Profile
 
 	return false;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
