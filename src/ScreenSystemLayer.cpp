@@ -4,6 +4,9 @@
 #include "ActorUtil.h"
 #include "GameState.h"
 #include "MemoryCardManager.h"
+
+#include "NetworkProfileManager.h"
+#include "Profile.h"
 #include "ProfileManager.h"
 #include "RageDisplay.h"
 #include "RageLog.h"
@@ -154,53 +157,74 @@ CString ScreenSystemLayer::GetCreditsMessage( PlayerNumber pn ) const
 	if( !bShowCreditsMessage )
 	{
 		// TODO: Make this work with either MEMCARDMAN or NETPROFMAN!
+		NetworkPassState nps = NETPROFMAN->GetPassState( pn );
 		MemoryCardState mcs = MEMCARDMAN->GetCardState( pn );
 		const Profile* pProfile = PROFILEMAN->GetProfile( pn );
-		switch( mcs )
+
+		if ( nps != NETWORK_PASS_ABSENT )
 		{
-		case MEMORY_CARD_STATE_NO_CARD:
-			// this is a local machine profile
-			if( PROFILEMAN->LastLoadWasFromLastGood(pn) )
-				return pProfile->GetDisplayName() + CREDITS_LOADED_FROM_LAST_GOOD_APPEND.GetValue();
-			else if( PROFILEMAN->LastLoadWasTamperedOrCorrupt(pn) )
-				return CREDITS_LOAD_FAILED.GetValue();
-			// Prefer the name of the profile over the name of the card.
-			else if( PROFILEMAN->IsPersistentProfile(pn) )
-				return pProfile->GetDisplayName();
-			else if( GAMESTATE->PlayersCanJoin() )
-				return CREDITS_INSERT_CARD.GetValue();
-			else
-				return "";
-
-		case MEMORY_CARD_STATE_ERROR: 		return THEME->GetMetric( m_sName, "CreditsCard" + MEMCARDMAN->GetCardError(pn) );
-		case MEMORY_CARD_STATE_TOO_LATE:	return CREDITS_CARD_TOO_LATE.GetValue();
-		case MEMORY_CARD_STATE_CHECKING:	return CREDITS_CARD_CHECKING.GetValue();
-		case MEMORY_CARD_STATE_REMOVED:		return CREDITS_CARD_REMOVED.GetValue();
-		case MEMORY_CARD_STATE_READY:
+			switch ( nps )
 			{
-				// If the profile failed to load and there was no usable backup...
-				if( PROFILEMAN->LastLoadWasTamperedOrCorrupt(pn) && !PROFILEMAN->LastLoadWasFromLastGood(pn) )
-					return CREDITS_LOAD_FAILED.GetValue();
-
-				// If there is a local profile loaded, prefer it over the name of the memory card.
-				if( PROFILEMAN->IsPersistentProfile(pn) )
-				{
+				case NETWORK_PASS_PRESENT:
+				case NETWORK_PASS_DOWNLOADING:
+					return CREDITS_CARD_CHECKING.GetValue();
+				case NETWORK_PASS_READY:
 					CString s = pProfile->GetDisplayName();
 					if( s.empty() )
 						s = CREDITS_CARD_NO_NAME.GetValue();
-					if( PROFILEMAN->LastLoadWasFromLastGood(pn) )
-						s += CREDITS_LOADED_FROM_LAST_GOOD_APPEND.GetValue();
 					return s;
-				}
-				else if( !MEMCARDMAN->IsNameAvailable(pn) )
-					return CREDITS_CARD_READY.GetValue();
-				else if( !MEMCARDMAN->GetName(pn).empty() )
-					return MEMCARDMAN->GetName(pn);
-				else
-					return CREDITS_CARD_NO_NAME.GetValue();
+				default:
+					return "HUH?";
 			}
-		default:
-			FAIL_M( ssprintf("%i",mcs) );
+		}
+		else
+		{
+			switch( mcs )
+			{
+			case MEMORY_CARD_STATE_NO_CARD:
+				// this is a local machine profile
+				if( PROFILEMAN->LastLoadWasFromLastGood(pn) )
+					return pProfile->GetDisplayName() + CREDITS_LOADED_FROM_LAST_GOOD_APPEND.GetValue();
+				else if( PROFILEMAN->LastLoadWasTamperedOrCorrupt(pn) )
+					return CREDITS_LOAD_FAILED.GetValue();
+				// Prefer the name of the profile over the name of the card.
+				else if( PROFILEMAN->IsPersistentProfile(pn) )
+					return pProfile->GetDisplayName();
+				else if( GAMESTATE->PlayersCanJoin() )
+					return CREDITS_INSERT_CARD.GetValue();
+				else
+					return "";
+
+			case MEMORY_CARD_STATE_ERROR: 		return THEME->GetMetric( m_sName, "CreditsCard" + MEMCARDMAN->GetCardError(pn) );
+			case MEMORY_CARD_STATE_TOO_LATE:	return CREDITS_CARD_TOO_LATE.GetValue();
+			case MEMORY_CARD_STATE_CHECKING:	return CREDITS_CARD_CHECKING.GetValue();
+			case MEMORY_CARD_STATE_REMOVED:		return CREDITS_CARD_REMOVED.GetValue();
+			case MEMORY_CARD_STATE_READY:
+				{
+					// If the profile failed to load and there was no usable backup...
+					if( PROFILEMAN->LastLoadWasTamperedOrCorrupt(pn) && !PROFILEMAN->LastLoadWasFromLastGood(pn) )
+						return CREDITS_LOAD_FAILED.GetValue();
+
+					// If there is a local profile loaded, prefer it over the name of the memory card.
+					if( PROFILEMAN->IsPersistentProfile(pn) )
+					{
+						CString s = pProfile->GetDisplayName();
+						if( s.empty() )
+							s = CREDITS_CARD_NO_NAME.GetValue();
+						if( PROFILEMAN->LastLoadWasFromLastGood(pn) )
+							s += CREDITS_LOADED_FROM_LAST_GOOD_APPEND.GetValue();
+						return s;
+					}
+					else if( !MEMCARDMAN->IsNameAvailable(pn) )
+						return CREDITS_CARD_READY.GetValue();
+					else if( !MEMCARDMAN->GetName(pn).empty() )
+						return MEMCARDMAN->GetName(pn);
+					else
+						return CREDITS_CARD_NO_NAME.GetValue();
+				}
+			default:
+				FAIL_M( ssprintf("%i",mcs) );
+			}
 		}
 	}
 	else // bShowCreditsMessage
