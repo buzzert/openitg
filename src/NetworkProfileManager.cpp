@@ -46,13 +46,18 @@ typedef enum {
 } ProfileDataType;
 
 typedef enum {
+	NetResponseStatusOK,
+	NetResponseStatusError
+} NetResponseStatusCodeType;
+
+typedef enum {
 	NetRequestTypeDownloadProfile,
 	NetRequestTypeUploadProfile
 } NetworkingRequestType;
 
 typedef enum {
 	NetResponseTypeProfile,
-	NetResponseTypeError
+	NetResponseTypeStatusCode
 } NetworkingResponseType;
 
 class NetworkingRequest
@@ -72,6 +77,9 @@ public:
 	void* GetResponseData() const { return m_pResponseData; };
 	NetworkingResponseType GetResponseType() const { return m_eResponseType; };
 
+	void* GetPayloadData() const { return m_pPayloadData; };
+	void SetPayloadData( void *payloadData ) { m_pPayloadData = payloadData; };
+
 private:
 	void SetResponseData( void *responseData ) { m_pResponseData = responseData; };
 	void SetResponseType( NetworkingResponseType t ) { m_eResponseType = t; };
@@ -83,6 +91,8 @@ private:
 
 	void *m_pRequestData;
 	void *m_pResponseData;
+
+	void *m_pPayloadData;
 
 	friend class NetworkProfileManagerThreads::NetworkingThread;
 };
@@ -103,6 +113,7 @@ namespace NetworkProfileManagerThreads {
 
 	private:
 		Profile* DownloadProfile( NetworkPass *pass );
+		bool UploadProfile( Profile *profile, NetworkPass *pass );
 
 		CURL *m_pCurlHandle;
 		std::queue<NetworkingRequest> m_qPendingRequests;
@@ -170,7 +181,7 @@ namespace NetworkProfileManagerThreads {
 		return true;
 	}
 
-	static size_t callback_write_data(void *buffer, size_t size, size_t num, void *userdata)
+	static size_t callback_write_data( void *buffer, size_t size, size_t num, void *userdata )
 	{
 		CString *pszXML = (CString *)userdata;
 		(*pszXML) += CString( (const char *)buffer );
@@ -228,6 +239,54 @@ namespace NetworkProfileManagerThreads {
 		return newProfile;
 	}
 
+	bool NetworkingThread::UploadProfile( Profile *profile, NetworkPass *pass )
+	{
+		std::stringstream ss;
+		ss << "http://" << g_sProfileServerURL.Get();
+		ss << "/smnetprof/upload_stats.php";
+
+		XNode *xml = profile->SaveStatsXmlCreateNode();
+		CString stringValue = xml->GetXML();
+
+		struct curl_httppost *formPost = NULL;
+		struct curl_httppost *lastItem = NULL;
+		struct curl_slist *headerList = NULL;
+		static const char buf[] = "Expect:";
+
+		curl_global_init( CURL_GLOBAL_ALL );
+
+		curl_formadd( &formPost,
+					  &lastItem,
+					  CURLFORM_COPYNAME, "id",
+					  CURLFORM_COPYCONTENTS, pass->m_sUniqueIdentifier.c_str(),
+					  CURLFORM_END
+		);
+
+		curl_formadd( &formPost,
+					  &lastItem,
+					  CURLFORM_COPYNAME, "xmlfile",
+					  CURLFORM_BUFFER, "stats",
+					  CURLFORM_BUFFERPTR, stringValue.c_str(),
+					  CURLFORM_END
+		);
+
+		headerList = curl_slist_append( headerList, buf );
+		curl_easy_setopt( m_pCurlHandle, CURLOPT_URL, ss.str().c_str() );
+		curl_easy_setopt( m_pCurlHandle, CURLOPT_HTTPHEADER, headerList );
+		curl_easy_setopt( m_pCurlHandle, CURLOPT_HTTPPOST, formPost );
+
+		CURLcode result = curl_easy_perform( m_pCurlHandle );
+		if( result != CURLE_OK )
+		{
+			LOG->Warn("NETPROFMAN ERROR: uploading profile %s", curl_easy_strerror( result ));
+		}
+
+		curl_formfree( formPost );
+		curl_slist_free_all( headerList );
+      
+		return result == CURLE_OK;
+	}
+
 	void NetworkingThread::DoHeartbeat()
 	{
 		if ( m_qPendingRequests.empty() )
@@ -250,6 +309,20 @@ namespace NetworkProfileManagerThreads {
 				CompletedRequestsMutex.Lock();
 				m_qCompletedRequests.push( request );
 				CompletedRequestsMutex.Unlock();
+			}
+			else if ( request.GetRequestType() == NetRequestTypeUploadProfile )
+			{
+				NetworkPass *pass = (NetworkPass *)request.GetRequestData();
+				Profile *profile = (Profile *)request.GetPayloadData();
+
+				bool success = UploadProfile( profile, pass );
+				//request.SetResponseData( success ? NetResponseStatusOK : NetResponseStatusError );
+				request.SetResponseType( NetResponseTypeStatusCode );
+
+				CompletedRequestsMutex.Lock();
+				m_qCompletedRequests.push( request );
+				CompletedRequestsMutex.Unlock();
+
 			}
 		}
 		PendingRequestsMutex.Unlock();
@@ -341,13 +414,11 @@ void NetworkProfileManager::ProcessNetworkPasses()
 	m_pInputHandler->m_bPassesChanged = false;
 }
 
-void NetworkProfileManager::ProcessDownloadedProfiles()
+void NetworkProfileManager::ProcessPendingProfiles()
 {
 	queue<NetworkingRequest> qCompletedRequests;
 	if ( m_pNetworkThread->GetCompletedNetworkRequests( qCompletedRequests ) )
 	{
-		NPMLog( "Got downloaded profiles! ");
-
 		while ( !qCompletedRequests.empty() )
 		{
 			NetworkingRequest request = qCompletedRequests.front();
@@ -366,7 +437,13 @@ void NetworkProfileManager::ProcessDownloadedProfiles()
 				params.m_bIsCriticalSound = true;
 				m_soundReady.Play( &params );
 
+				SCREENMAN->SystemMessage( "Welcome buzzert! Balance remaining: $12.50" );
+
 				NPMLog( "Profile successfully loaded" );
+			}
+			else if ( request.GetRequestType() == NetRequestTypeUploadProfile )
+			{
+				NPMLog( "successfully uploaded profile! I think..." );
 			}
 		}
 	}
@@ -375,17 +452,39 @@ void NetworkProfileManager::ProcessDownloadedProfiles()
 void NetworkProfileManager::Update()
 {
 	ProcessNetworkPasses();
-	ProcessDownloadedProfiles();
+	ProcessPendingProfiles();
 }
 
 bool NetworkProfileManager::LoadProfileForPlayerNumber( PlayerNumber pn, Profile &profile )
 {
 	if ( m_State[pn] == NETWORK_PASS_READY )
 	{
-		profile = *(m_DownloadedProfiles[pn]);
+		profile = m_DownloadedProfiles[pn];
 		return true;
 	}
 
 	return false;
+}
+
+bool NetworkProfileManager::SaveProfileForPlayerNumber( PlayerNumber pn, const Profile &profile )
+{
+	if ( m_State[pn] != NETWORK_PASS_READY || m_DownloadedProfiles[pn] == NULL )
+	{
+		NPMLog( "Attempted to save profile that wasn't ready" );
+		return false;
+	}
+
+	NPMLog( "Saving profile!" );
+	NetworkingRequest saveRequest( NetRequestTypeUploadProfile, pn, m_Passes[pn] );
+	saveRequest.SetPayloadData( new Profile( profile ) ); // XXX: Probably not the best way to do this...
+
+	m_pNetworkThread->AddNetworkRequest( saveRequest );
+
+	m_State[pn] = NETWORK_PASS_SAVING;
+	SCREENMAN->RefreshCreditsMessages();
+
+	// NPMTODO: disconnect or update profile after a short interval...
+
+	return true; // NPMTODO: error handling
 }
 

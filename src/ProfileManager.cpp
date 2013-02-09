@@ -45,6 +45,7 @@ void ProfileManager::Init()
 		m_bLastLoadWasTamperedOrCorrupt[p] = false;
 		m_bLastLoadWasFromLastGood[p] = false;
 		m_bNewProfile[p] = false;
+		m_bNetworkProfile[p] = false;
 	}
 
 	LoadMachineProfile();
@@ -247,9 +248,11 @@ Profile::LoadResult ProfileManager::LoadEditableDataFromMemoryCard( PlayerNumber
 
 bool ProfileManager::LoadProfileFromNetwork( PlayerNumber pn )
 {
-	LOG->Info("*** LOADING PROFILE FROM NETPROFMAN!");
-	NETPROFMAN->LoadProfileForPlayerNumber(pn, m_Profile[pn]);
-	return true; // idk wut
+	// TODO checks
+	NETPROFMAN->LoadProfileForPlayerNumber(pn, &m_Profile[pn]);
+	m_bNetworkProfile[pn] = true;
+
+	return true;
 }
 			
 bool ProfileManager::LoadFirstAvailableProfile( PlayerNumber pn )
@@ -257,10 +260,10 @@ bool ProfileManager::LoadFirstAvailableProfile( PlayerNumber pn )
 	if( LoadProfileFromMemoryCard(pn) )
 		return true;
 
-	if( LoadLocalProfileFromMachine(pn) )
-		return true;
-	
 	if ( LoadProfileFromNetwork(pn) )
+		return true;
+
+	if( LoadLocalProfileFromMachine(pn) )
 		return true;
 	
 	return false;
@@ -306,6 +309,10 @@ void ProfileManager::SaveAllProfiles() const
 
 bool ProfileManager::SaveProfile( PlayerNumber pn ) const
 {
+	if ( IsNetworkProfile(pn) ) {
+		return NETPROFMAN->SaveProfileForPlayerNumber( pn, m_Profile[pn] );
+	}
+
 	if( m_sProfileDir[pn].empty() )
 		return false;
 

@@ -156,10 +156,9 @@ CString ScreenSystemLayer::GetCreditsMessage( PlayerNumber pn ) const
 		
 	if( !bShowCreditsMessage )
 	{
-		// TODO: Make this work with either MEMCARDMAN or NETPROFMAN!
 		NetworkPassState nps = NETPROFMAN->GetPassState( pn );
 		MemoryCardState mcs = MEMCARDMAN->GetCardState( pn );
-		const Profile* pProfile = PROFILEMAN->GetProfile( pn );
+		Profile* pProfile = PROFILEMAN->GetProfile( pn );
 
 		if ( nps != NETWORK_PASS_ABSENT )
 		{
@@ -169,6 +168,8 @@ CString ScreenSystemLayer::GetCreditsMessage( PlayerNumber pn ) const
 				case NETWORK_PASS_DOWNLOADING:
 					return CREDITS_CARD_CHECKING.GetValue();
 				case NETWORK_PASS_READY: {
+					// This is currently a hack
+					NETPROFMAN->LoadProfileForPlayerNumber( pn, *pProfile );
 					CString s = pProfile->GetDisplayName();
 					if( s.empty() )
 						s = CREDITS_CARD_NO_NAME.GetValue();

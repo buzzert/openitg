@@ -350,6 +350,10 @@ void SongManager::LoadPlayerSongs( PlayerNumber pn )
 	if( !PROFILEMAN->IsPersistentProfile(pn) )
 		return;
 
+	// Network profiles currently unsupported
+	if ( PROFILEMAN->IsNetworkProfile(pn) )
+		return;
+
 	// likewise if customs are disabled (sanity check as of now)
 	if( !PREFSMAN->m_bCustomSongs )
 		return;

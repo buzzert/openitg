@@ -35,11 +35,13 @@ public:
 	void Update();
 
 	NetworkPassState GetPassState( PlayerNumber pn ) const { return m_State[pn]; }
+
 	bool LoadProfileForPlayerNumber( PlayerNumber pn, Profile &profile );
+	bool SaveProfileForPlayerNumber( PlayerNumber pn, const Profile &profile );
 	
 protected:
 	void ProcessNetworkPasses();
-	void ProcessDownloadedProfiles();
+	void ProcessPendingProfiles();
 
 	// Threads
 	NetworkProfileManagerThreads::NetworkingThread *m_pNetworkThread;

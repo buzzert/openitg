@@ -50,8 +50,10 @@ public:
 	void LoadMachineProfile();
 	void SaveMachineProfile() const;
 
-	bool IsPersistentProfile( PlayerNumber pn ) const { return true; /* return !m_sProfileDir[pn].empty(); */ } // this needs to return true for network profiles!
+	bool IsPersistentProfile( PlayerNumber pn ) const { return m_bNetworkProfile[pn] || !m_sProfileDir[pn].empty(); }
 	bool IsPersistentProfile( ProfileSlot slot ) const;
+
+	bool IsNetworkProfile( PlayerNumber pn ) const { return m_bNetworkProfile[pn]; }
 
 	// return a profile even if !IsUsingProfile
 	const Profile* GetProfile( PlayerNumber pn ) const;
@@ -113,6 +115,7 @@ private:
 	bool m_bLastLoadWasTamperedOrCorrupt[NUM_PLAYERS];	// true if Stats.xml was present, but failed to load (probably because of a signature failure)
 	bool m_bLastLoadWasFromLastGood[NUM_PLAYERS];		// if true, then m_bLastLoadWasTamperedOrCorrupt is also true
 	bool m_bNewProfile[NUM_PLAYERS];
+	bool m_bNetworkProfile[NUM_PLAYERS];
 	
 	// actual loaded profile data
 	Profile	m_Profile[NUM_PLAYERS];	
