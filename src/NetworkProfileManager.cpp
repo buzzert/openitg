@@ -31,32 +31,17 @@ static void NPMLog( CString message )
 NetworkProfileManager *NETPROFMAN = NULL;
 
 typedef enum {
-	ProfileDataTypeGeneral,
-	ProfileDataTypeStats,
-		
-	ProfileDataTypeSongScores,
-	ProfileDataTypeCourseScores,
-	ProfileDataTypeCategoryScores,
-		
-	ProfileDataTypeScreenshotData,
-	ProfileDataTypeCalorieData,
-		
-	ProfileDataTypeRecentSongScores,
-	ProfileDataTypeRecentCourseScores,
-} ProfileDataType;
-
-typedef enum {
 	NetResponseStatusOK,
 	NetResponseStatusError
 } NetResponseStatusCodeType;
 
 typedef enum {
-	NetRequestTypeDownloadProfile,
+	NetRequestTypeDownloadBiscuit,
 	NetRequestTypeUploadProfile
 } NetworkingRequestType;
 
 typedef enum {
-	NetResponseTypeProfile,
+	NetResponseTypeBiscuit,
 	NetResponseTypeStatusCode
 } NetworkingResponseType;
 
@@ -112,7 +97,7 @@ namespace NetworkProfileManagerThreads {
 		void HandleRequest( int iRequest ) {};
 
 	private:
-		Profile* DownloadProfile( NetworkPass *pass );
+		PlayerBiscuit* DownloadPlayerBiscuit( NetworkPass *pass );
 		bool UploadProfile( Profile *profile, NetworkPass *pass );
 
 		CURL *m_pCurlHandle;
@@ -188,29 +173,29 @@ namespace NetworkProfileManagerThreads {
 		return (size * num);
 	}
 
-	Profile* NetworkingThread::DownloadProfile( NetworkPass *pass )
+	PlayerBiscuit* NetworkingThread::DownloadPlayerBiscuit( NetworkPass *pass )
 	{
 		std::stringstream ss;
 		ss << "http://" << g_sProfileServerURL.Get();
 		ss << "/smnetprof/get_stats.php?id=" << pass->m_sUniqueIdentifier;
 
-		LOG->Warn("***** SS: %s", ss.str().c_str());
-
 		CString resultString;
 		curl_easy_setopt( m_pCurlHandle, CURLOPT_WRITEFUNCTION, callback_write_data );
 		curl_easy_setopt( m_pCurlHandle, CURLOPT_WRITEDATA, &resultString );
+
+		// NPMTODO: Checking, error handling
+		PlayerBiscuit *biscuit = new PlayerBiscuit;
 
 		// get stats
 		curl_easy_setopt( m_pCurlHandle, CURLOPT_URL, (ss.str() + "&type=stats").c_str() );
 		CURLcode success = curl_easy_perform( m_pCurlHandle );
 
 		// parse stats
-		XNode xmlNode;
+		XNode *statsXML = new XNode();
 		PARSEINFO pi;
-		xmlNode.Load( resultString, &pi );
+		statsXML->Load( resultString, &pi );
 
-		Profile *newProfile = new Profile();
-		Profile::LoadResult result = newProfile->LoadStatsXmlFromNode( &xmlNode );
+		biscuit->statsNode = statsXML;
 
 		// get editable
 		resultString = "";
@@ -218,25 +203,12 @@ namespace NetworkProfileManagerThreads {
 		success = curl_easy_perform( m_pCurlHandle );
 
 		// parse editable
-		LOG->Warn("EDITABLE: %s", resultString.c_str());
-		xmlNode.Load( resultString, &pi );
+		XNode *editableXML = new XNode();
+		editableXML->Load( resultString, &pi );
 
-		if ( xmlNode.m_sName == "Editable" ) {
-			int weight;
-			CString displayName, highScoreName;
+		biscuit->editableNode = editableXML;
 
-			xmlNode.GetChildValue( "DisplayName", displayName );
-			xmlNode.GetChildValue( "LastUsedHighScoreName", highScoreName );
-			xmlNode.GetChildValue( "WeightPounds", weight );
-
-			LOG->Warn("****** NAME: %s", displayName.c_str());
-
-			newProfile->m_sDisplayName = displayName;
-			newProfile->m_sLastUsedHighScoreName = highScoreName;
-			newProfile->m_iWeightPounds = weight;
-		}
-
-		return newProfile;
+		return biscuit;
 	}
 
 	bool NetworkingThread::UploadProfile( Profile *profile, NetworkPass *pass )
@@ -298,13 +270,13 @@ namespace NetworkProfileManagerThreads {
 			NetworkingRequest request = m_qPendingRequests.front();
 			m_qPendingRequests.pop();
 
-			if ( request.GetRequestType() == NetRequestTypeDownloadProfile )
+			if ( request.GetRequestType() == NetRequestTypeDownloadBiscuit )
 			{
 				NetworkPass *pass = (NetworkPass *)request.GetRequestData();
 
-				Profile *profile = DownloadProfile( pass );
-				request.SetResponseData( profile );
-				request.SetResponseType( NetResponseTypeProfile );
+				PlayerBiscuit *biscuit = DownloadPlayerBiscuit( pass );
+				request.SetResponseData( biscuit );
+				request.SetResponseType( NetResponseTypeBiscuit );
 
 				CompletedRequestsMutex.Lock();
 				m_qCompletedRequests.push( request );
@@ -401,7 +373,7 @@ void NetworkProfileManager::ProcessNetworkPasses()
 				m_Passes[p] = newPass;
 
 				// Start downloading profile
-				NetworkingRequest request( NetRequestTypeDownloadProfile, p, newPass );
+				NetworkingRequest request( NetRequestTypeDownloadBiscuit, p, newPass );
 				m_pNetworkThread->AddNetworkRequest( request );
 
 				m_State[p] = NETWORK_PASS_DOWNLOADING;
@@ -424,11 +396,11 @@ void NetworkProfileManager::ProcessPendingProfiles()
 			NetworkingRequest request = qCompletedRequests.front();
 			qCompletedRequests.pop();
 
-			if ( request.GetResponseType() == NetResponseTypeProfile )
+			if ( request.GetResponseType() == NetResponseTypeBiscuit )
 			{
 				PlayerNumber pn = request.GetPlayerNumber();
 
-				m_DownloadedProfiles[pn] = (Profile *)request.GetResponseData();
+				m_DownloadedBiscuits[pn] = (PlayerBiscuit *)request.GetResponseData();
 				m_State[pn] = NETWORK_PASS_READY;
 
 				SCREENMAN->RefreshCreditsMessages();
@@ -437,13 +409,14 @@ void NetworkProfileManager::ProcessPendingProfiles()
 				params.m_bIsCriticalSound = true;
 				m_soundReady.Play( &params );
 
+				// do some credits stuff here soon!
 				SCREENMAN->SystemMessage( "Welcome buzzert! Balance remaining: $12.50" );
 
-				NPMLog( "Profile successfully loaded" );
+				NPMLog( "Biscuit was downloaded" );
 			}
 			else if ( request.GetRequestType() == NetRequestTypeUploadProfile )
 			{
-				NPMLog( "successfully uploaded profile! I think..." );
+				NPMLog( "successfully uploaded profile!" );
 			}
 		}
 	}
@@ -459,7 +432,25 @@ bool NetworkProfileManager::LoadProfileForPlayerNumber( PlayerNumber pn, Profile
 {
 	if ( m_State[pn] == NETWORK_PASS_READY )
 	{
-		profile = m_DownloadedProfiles[pn];
+		PlayerBiscuit *myBiscuit = m_DownloadedBiscuits[pn];
+		XNode *statsNode = myBiscuit->statsNode;;
+		XNode *editableNode = myBiscuit->editableNode;
+
+		// Load stats
+		profile.LoadStatsXmlFromNode(statsNode);
+
+		// Load editable
+		int weight;
+		CString displayName, highScoreName;
+
+		editableNode->GetChildValue( "DisplayName", displayName );
+		editableNode->GetChildValue( "LastUsedHighScoreName", highScoreName );
+		editableNode->GetChildValue( "WeightPounds", weight );
+
+		profile.m_sDisplayName = displayName;
+		profile.m_sLastUsedHighScoreName = highScoreName;
+		profile.m_iWeightPounds = weight;
+
 		return true;
 	}
 
@@ -468,7 +459,7 @@ bool NetworkProfileManager::LoadProfileForPlayerNumber( PlayerNumber pn, Profile
 
 bool NetworkProfileManager::SaveProfileForPlayerNumber( PlayerNumber pn, const Profile &profile )
 {
-	if ( m_State[pn] != NETWORK_PASS_READY || m_DownloadedProfiles[pn] == NULL )
+	if ( m_State[pn] != NETWORK_PASS_READY )
 	{
 		NPMLog( "Attempted to save profile that wasn't ready" );
 		return false;

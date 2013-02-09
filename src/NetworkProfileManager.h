@@ -19,6 +19,11 @@ namespace NetworkProfileManagerThreads {
 	class GenesisInputHandlerThread;
 }
 
+typedef struct {
+	XNode *statsNode;
+	XNode *editableNode;
+} PlayerBiscuit;
+
 class NetworkPass
 {
 public:
@@ -50,7 +55,7 @@ protected:
 	NetworkPassState m_State[NUM_PLAYERS];
 	NetworkPass* m_Passes[NUM_PLAYERS];
 
-	Profile* m_DownloadedProfiles[NUM_PLAYERS];
+	PlayerBiscuit *m_DownloadedBiscuits[NUM_PLAYERS];
 private:
 	RageSound m_soundReady;
 	RageSound m_soundDisconnect;

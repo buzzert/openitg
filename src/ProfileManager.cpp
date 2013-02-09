@@ -249,7 +249,7 @@ Profile::LoadResult ProfileManager::LoadEditableDataFromMemoryCard( PlayerNumber
 bool ProfileManager::LoadProfileFromNetwork( PlayerNumber pn )
 {
 	// TODO checks
-	NETPROFMAN->LoadProfileForPlayerNumber(pn, &m_Profile[pn]);
+	NETPROFMAN->LoadProfileForPlayerNumber(pn, m_Profile[pn]);
 	m_bNetworkProfile[pn] = true;
 
 	return true;
