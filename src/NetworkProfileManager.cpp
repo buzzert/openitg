@@ -12,6 +12,7 @@
 #include "XmlFile.h"
 #include "Preference.h"
 #include "RageThreads.h"
+#include "io/Genesis.h"
 
 // libcurl
 #include <curl/curl.h>
@@ -103,7 +104,6 @@ namespace NetworkProfileManagerThreads {
 	private:
 		Profile* DownloadProfile( NetworkPass *pass );
 
-		// GenesisDriver *m_pDriver;
 		CURL *m_pCurlHandle;
 		std::queue<NetworkingRequest> m_qPendingRequests;
 		std::queue<NetworkingRequest> m_qCompletedRequests;
@@ -125,7 +125,7 @@ namespace NetworkProfileManagerThreads {
 		void DoHeartbeat();
 		void HandleRequest( int iRequest ) {};
 
-		int iTestCounter;
+		GenesisScanner *m_pDriver;
 	};
 
 
@@ -179,17 +179,21 @@ namespace NetworkProfileManagerThreads {
 
 	Profile* NetworkingThread::DownloadProfile( NetworkPass *pass )
 	{
-		LOG->Info( "*** NETPROFMAN: downloading pass! (%d)", pass->m_uUniqueIdentifier );
-
 		std::stringstream ss;
-		ss << "http://" << g_sProfileServerURL.Get() << "/get_stats.php?id=" << pass->m_uUniqueIdentifier;
+		ss << "http://" << g_sProfileServerURL.Get();
+		ss << "/smnetprof/get_stats.php?id=" << pass->m_sUniqueIdentifier;
+
+		LOG->Warn("***** SS: %s", ss.str().c_str());
 
 		CString resultString;
-		curl_easy_setopt( m_pCurlHandle, CURLOPT_URL, ss.str().c_str() );
 		curl_easy_setopt( m_pCurlHandle, CURLOPT_WRITEFUNCTION, callback_write_data );
 		curl_easy_setopt( m_pCurlHandle, CURLOPT_WRITEDATA, &resultString );
+
+		// get stats
+		curl_easy_setopt( m_pCurlHandle, CURLOPT_URL, (ss.str() + "&type=stats").c_str() );
 		CURLcode success = curl_easy_perform( m_pCurlHandle );
 
+		// parse stats
 		XNode xmlNode;
 		PARSEINFO pi;
 		xmlNode.Load( resultString, &pi );
@@ -197,7 +201,29 @@ namespace NetworkProfileManagerThreads {
 		Profile *newProfile = new Profile();
 		Profile::LoadResult result = newProfile->LoadStatsXmlFromNode( &xmlNode );
 
-		LOG->Info( "*** Got profile with diff: %d", newProfile->m_LastDifficulty );
+		// get editable
+		resultString = "";
+		curl_easy_setopt( m_pCurlHandle, CURLOPT_URL, (ss.str() + "&type=editable").c_str() );
+		success = curl_easy_perform( m_pCurlHandle );
+
+		// parse editable
+		LOG->Warn("EDITABLE: %s", resultString.c_str());
+		xmlNode.Load( resultString, &pi );
+
+		if ( xmlNode.m_sName == "Editable" ) {
+			int weight;
+			CString displayName, highScoreName;
+
+			xmlNode.GetChildValue( "DisplayName", displayName );
+			xmlNode.GetChildValue( "LastUsedHighScoreName", highScoreName );
+			xmlNode.GetChildValue( "WeightPounds", weight );
+
+			LOG->Warn("****** NAME: %s", displayName.c_str());
+
+			newProfile->m_sDisplayName = displayName;
+			newProfile->m_sLastUsedHighScoreName = highScoreName;
+			newProfile->m_iWeightPounds = weight;
+		}
 
 		return newProfile;
 	}
@@ -237,26 +263,27 @@ namespace NetworkProfileManagerThreads {
 	{
 		m_bPassesChanged = false;
 
-		iTestCounter = 0;
+		// initialize driver
+		m_pDriver = new GenesisScanner();
+		if ( !m_pDriver->Open() ) {
+			LOG->Warn( "ERROR OPENING GENESIS SCANNER DEVICE! :(" );
+			return;
+		}
 
 		SetHeartbeat( 0.1f );
 		StartThread();
-
-		// initialize driver
 	}
 
 	void GenesisInputHandlerThread::DoHeartbeat()
 	{
-		iTestCounter++;
-
+		char *pDataIn;
 		NetworkPass *newPass = NULL;
-		if ( iTestCounter == 35 )
-		{
-			newPass = new NetworkPass( 1 );
-		}
+		while ( m_pDriver->Read( &pDataIn ) ) {
+			CString passString = CString( pDataIn );
 
-		if ( newPass )
-		{
+			LOG->Info( "*** GenesisInput: got new pass: %s", passString.c_str() );
+
+			newPass = new NetworkPass( passString );
 			m_bPassesChanged = true;
 			m_qPassQueue.push( newPass );
 		}
@@ -306,6 +333,7 @@ void NetworkProfileManager::ProcessNetworkPasses()
 
 				m_State[p] = NETWORK_PASS_DOWNLOADING;
 				SCREENMAN->RefreshCreditsMessages();
+				break;
 			}
 		}
 	}

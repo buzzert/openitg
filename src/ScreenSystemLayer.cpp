@@ -168,13 +168,14 @@ CString ScreenSystemLayer::GetCreditsMessage( PlayerNumber pn ) const
 				case NETWORK_PASS_PRESENT:
 				case NETWORK_PASS_DOWNLOADING:
 					return CREDITS_CARD_CHECKING.GetValue();
-				case NETWORK_PASS_READY:
+				case NETWORK_PASS_READY: {
 					CString s = pProfile->GetDisplayName();
 					if( s.empty() )
 						s = CREDITS_CARD_NO_NAME.GetValue();
 					return s;
+				}
 				default:
-					return "HUH?";
+					return "ERROR?";
 			}
 		}
 		else

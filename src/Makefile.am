@@ -145,7 +145,7 @@ LIBS += -lusb
 
 USBIO = io/USBDriver.cpp io/USBDriver.h io/PIUIO.cpp io/PIUIO.h io/ITGIO.cpp \
 	io/ITGIO.h io/PacDrive.cpp io/PacDrive.h io/G15.cpp io/G15.h \
-	io/USBDevice.h io/MiniMaid.cpp io/MiniMaid.h
+	io/USBDevice.h io/MiniMaid.cpp io/MiniMaid.h io/Genesis.h io/Genesis.cpp
 
 DataStructures += $(USBIO)
 USBDriver += arch/USB/USBDriver_Impl_Libusb.cpp arch/USB/USBDriver_Impl_Libusb.h

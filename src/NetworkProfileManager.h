@@ -22,8 +22,8 @@ namespace NetworkProfileManagerThreads {
 class NetworkPass
 {
 public:
-	NetworkPass( uint64_t uUniqueIdentifier ) : m_uUniqueIdentifier( uUniqueIdentifier ) {};
-	uint64_t m_uUniqueIdentifier;
+	NetworkPass( CString sUniqueIdentifier ) : m_sUniqueIdentifier( sUniqueIdentifier ) {};
+	CString m_sUniqueIdentifier;
 };
 
 class NetworkProfileManager
