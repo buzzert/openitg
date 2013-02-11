@@ -7,6 +7,7 @@
 #include "ActorUtil.h"
 #include "RageSound.h"
 #include "MemoryCardDisplay.h"
+#include "NetworkProfileDisplay.h"
 #include "ThemeMetric.h"
 
 class MenuTimer;
@@ -42,15 +43,16 @@ protected:
 
 	void UpdateStage();
 
-	AutoActor			m_sprUnderlay;
-	AutoActor			m_autoHeader;
-	Sprite				m_sprStyleIcon;
-	AutoActor			m_sprStage[NUM_STAGES];
-	MemoryCardDisplay	m_MemoryCardDisplay[NUM_PLAYERS];
-	MenuTimer			*m_MenuTimer;
-	AutoActor			m_autoFooter;
-	HelpDisplay			*m_textHelp;
-	AutoActor			m_sprOverlay;
+	AutoActor				m_sprUnderlay;
+	AutoActor				m_autoHeader;
+	Sprite					m_sprStyleIcon;
+	AutoActor				m_sprStage[NUM_STAGES];
+	MemoryCardDisplay		m_MemoryCardDisplay[NUM_PLAYERS];
+	NetworkProfileDisplay 	m_NetworkProfileDisplay[NUM_PLAYERS];
+	MenuTimer				*m_MenuTimer;
+	AutoActor				m_autoFooter;
+	HelpDisplay				*m_textHelp;
+	AutoActor				m_sprOverlay;
 
 	Transition	m_In;
 	Transition	m_Out;

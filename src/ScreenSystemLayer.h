@@ -54,6 +54,8 @@ private:
 	ThemeMetric<CString> CREDITS_LOAD_FAILED;
 	ThemeMetric<CString> CREDITS_LOADED_FROM_LAST_GOOD_APPEND;
 	ThemeMetric<bool> CREDITS_JOIN_ONLY;
+	ThemeMetric<CString> CREDITS_NET_DOWNLOADING;
+	ThemeMetric<CString> CREDITS_NET_SAVING;
 };
 
 

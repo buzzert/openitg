@@ -849,7 +849,7 @@ bool Profile::SaveAllToDir( CString sDir, bool bSignData ) const
 	return bSaved;
 }
 
-XNode *Profile::SaveStatsXmlCreateNode() const
+XNode *Profile::SaveStatsXmlCreateNode( bool saveRecentData ) const
 {
 	XNode *xml = new XNode;
 
@@ -860,8 +860,12 @@ XNode *Profile::SaveStatsXmlCreateNode() const
 	xml->AppendChild( SaveCategoryScoresCreateNode() );
 	xml->AppendChild( SaveScreenshotDataCreateNode() );
 	xml->AppendChild( SaveCalorieDataCreateNode() );
-	xml->AppendChild( SaveRecentSongScoresCreateNode() );
-	xml->AppendChild( SaveRecentCourseScoresCreateNode() );
+
+	if ( saveRecentData )
+	{
+		xml->AppendChild( SaveRecentSongScoresCreateNode() );
+		xml->AppendChild( SaveRecentCourseScoresCreateNode() );
+	}
 	
 	// append totals for regular and service credits
 	if( IsMachine() )

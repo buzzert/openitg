@@ -30,6 +30,10 @@ ScreenSystemLayer::ScreenSystemLayer( const CString &sName ) : Screen(sName)
 	CREDITS_CARD_READY		.Load(m_sName,"CreditsCardReady");
 	CREDITS_CARD_CHECKING	.Load(m_sName,"CreditsCardChecking");
 	CREDITS_CARD_REMOVED	.Load(m_sName,"CreditsCardRemoved");
+
+	CREDITS_NET_DOWNLOADING .Load(m_sName,"NetworkProfileDownloading");
+	CREDITS_NET_SAVING      .Load(m_sName,"NetworkProfileSaving");
+
 	CREDITS_FREE_PLAY		.Load(m_sName,"CreditsFreePlay");
 	CREDITS_CREDITS			.Load(m_sName,"CreditsCredits");
 	CREDITS_NOT_PRESENT		.Load(m_sName,"CreditsNotPresent");
@@ -153,6 +157,9 @@ CString ScreenSystemLayer::GetCreditsMessage( PlayerNumber pn ) const
 		bShowCreditsMessage = !GAMESTATE->IsPlayerEnabled( pn );
 	else 
 		bShowCreditsMessage = !GAMESTATE->m_bSideIsJoined[pn];
+
+	if ( NETPROFMAN->GetPassState( pn ) == NETWORK_PASS_SAVING )
+		bShowCreditsMessage = true;
 		
 	if( !bShowCreditsMessage )
 	{
@@ -166,17 +173,17 @@ CString ScreenSystemLayer::GetCreditsMessage( PlayerNumber pn ) const
 			{
 				case NETWORK_PASS_PRESENT:
 				case NETWORK_PASS_DOWNLOADING:
-					return CREDITS_CARD_CHECKING.GetValue();
+					return CREDITS_NET_DOWNLOADING.GetValue();
+				case NETWORK_PASS_SAVING:
+					return CREDITS_NET_SAVING.GetValue();
 				case NETWORK_PASS_READY: {
-					// This is currently a hack
-					NETPROFMAN->LoadProfileForPlayerNumber( pn, *pProfile );
-					CString s = pProfile->GetDisplayName();
+					CString s = NETPROFMAN->GetProfileDisplayString( pn );
 					if( s.empty() )
 						s = CREDITS_CARD_NO_NAME.GetValue();
 					return s;
 				}
 				default:
-					return "ERROR?";
+					return "NPM ERROR!";
 			}
 		}
 		else

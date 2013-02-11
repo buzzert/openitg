@@ -4,14 +4,7 @@
 #include "PlayerNumber.h"
 #include "RageSound.h"
 #include "Profile.h"
-
-typedef enum {
-	NETWORK_PASS_ABSENT,
-	NETWORK_PASS_PRESENT,
-	NETWORK_PASS_DOWNLOADING,
-	NETWORK_PASS_SAVING,
-	NETWORK_PASS_READY
-} NetworkPassState;
+#include "GameConstantsAndTypes.h"
 
 
 namespace NetworkProfileManagerThreads {
@@ -40,10 +33,11 @@ public:
 	void Update();
 
 	NetworkPassState GetPassState( PlayerNumber pn ) const { return m_State[pn]; }
+	CString GetProfileDisplayString( PlayerNumber pn );
 
 	bool LoadProfileForPlayerNumber( PlayerNumber pn, Profile &profile );
 	bool SaveProfileForPlayerNumber( PlayerNumber pn, const Profile &profile );
-	
+
 protected:
 	void ProcessNetworkPasses();
 	void ProcessPendingProfiles();
@@ -59,6 +53,8 @@ protected:
 private:
 	RageSound m_soundReady;
 	RageSound m_soundDisconnect;
+	RageSound m_soundScanned;
+	RageSound m_soundSaved;
 };
 
 extern NetworkProfileManager* NETPROFMAN;

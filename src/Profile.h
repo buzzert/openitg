@@ -307,7 +307,7 @@ public:
 
 	void SaveEditableDataToDir( CString sDir ) const;
 	bool SaveStatsXmlToDir( CString sDir, bool bSignData ) const;
-	XNode* SaveStatsXmlCreateNode() const;
+	XNode* SaveStatsXmlCreateNode( bool saveRecentData = true ) const;
 	XNode* SaveGeneralDataCreateNode() const;
 	XNode* SaveSongScoresCreateNode() const;
 	XNode* SaveCourseScoresCreateNode() const;

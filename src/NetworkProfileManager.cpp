@@ -208,6 +208,9 @@ namespace NetworkProfileManagerThreads {
 
 		biscuit->editableNode = editableXML;
 
+		// FOR TESTING INTERFACE
+		sleep( 2 );
+
 		return biscuit;
 	}
 
@@ -217,7 +220,7 @@ namespace NetworkProfileManagerThreads {
 		ss << "http://" << g_sProfileServerURL.Get();
 		ss << "/smnetprof/upload_stats.php";
 
-		XNode *xml = profile->SaveStatsXmlCreateNode();
+		XNode *xml = profile->SaveStatsXmlCreateNode( false );
 		CString stringValue = xml->GetXML();
 
 		struct curl_httppost *formPost = NULL;
@@ -255,6 +258,9 @@ namespace NetworkProfileManagerThreads {
 
 		curl_formfree( formPost );
 		curl_slist_free_all( headerList );
+
+		// FOR TESTING INTERFACE
+		sleep( 2 );
       
 		return result == CURLE_OK;
 	}
@@ -351,6 +357,8 @@ NetworkProfileManager::NetworkProfileManager()
 	// preload sounds
 	m_soundReady.Load( THEME->GetPathS("MemoryCardManager", "ready"), true );
 	m_soundDisconnect.Load( THEME->GetPathS("MemoryCardManager", "disconnect"), true );
+	m_soundScanned.Load( THEME->GetPathS("NetworkProfileManager", "scanned"), true );
+	m_soundSaved.Load( THEME->GetPathS("NetworkProfileManager", "saved"), true );
 }
 
 void NetworkProfileManager::ProcessNetworkPasses()
@@ -375,6 +383,10 @@ void NetworkProfileManager::ProcessNetworkPasses()
 				// Start downloading profile
 				NetworkingRequest request( NetRequestTypeDownloadBiscuit, p, newPass );
 				m_pNetworkThread->AddNetworkRequest( request );
+
+				RageSoundParams params;
+				params.m_bIsCriticalSound = true;
+				m_soundScanned.Play( &params );
 
 				m_State[p] = NETWORK_PASS_DOWNLOADING;
 				SCREENMAN->RefreshCreditsMessages();
@@ -416,7 +428,14 @@ void NetworkProfileManager::ProcessPendingProfiles()
 			}
 			else if ( request.GetRequestType() == NetRequestTypeUploadProfile )
 			{
-				NPMLog( "successfully uploaded profile!" );
+				RageSoundParams params;
+				params.m_bIsCriticalSound = true;
+				m_soundSaved.Play( &params );
+
+				PlayerNumber pn = request.GetPlayerNumber();
+
+				m_State[pn] = NETWORK_PASS_READY;
+				SCREENMAN->RefreshCreditsMessages();
 			}
 		}
 	}
@@ -426,6 +445,23 @@ void NetworkProfileManager::Update()
 {
 	ProcessNetworkPasses();
 	ProcessPendingProfiles();
+}
+
+CString NetworkProfileManager::GetProfileDisplayString( PlayerNumber pn )
+{
+	if ( m_State[pn] != NETWORK_PASS_ABSENT )
+	{
+		PlayerBiscuit *myBiscuit = m_DownloadedBiscuits[pn];
+		if ( myBiscuit )
+		{
+			CString displayName;
+			myBiscuit->editableNode->GetChildValue( "DisplayName", displayName );
+
+			return displayName;
+		}
+	}
+
+	return "Network Profile";
 }
 
 bool NetworkProfileManager::LoadProfileForPlayerNumber( PlayerNumber pn, Profile &profile )
@@ -478,4 +514,3 @@ bool NetworkProfileManager::SaveProfileForPlayerNumber( PlayerNumber pn, const P
 
 	return true; // NPMTODO: error handling
 }
-

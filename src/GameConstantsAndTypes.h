@@ -189,6 +189,19 @@ enum MemoryCardState
 const CString& MemoryCardStateToString( MemoryCardState mcs );
 
 
+enum NetworkPassState {
+	NETWORK_PASS_ABSENT,
+	NETWORK_PASS_PRESENT,
+	NETWORK_PASS_DOWNLOADING,
+	NETWORK_PASS_SAVING,
+	NETWORK_PASS_READY,
+	NUM_NETWORK_PASS_STATES,
+	NETWORK_PASS_INVALID
+};
+
+const CString& NetworkPassStateToString( NetworkPassState nps );
+
+
 //
 // Ranking stuff
 //

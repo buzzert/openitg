@@ -71,6 +71,18 @@ void ScreenWithMenuElements::Init()
 		}
 		UpdateStage();
 	}
+
+	// Network profile icons should be shown wherever memory card icons are.
+	if ( MEMORY_CARD_ICONS )
+	{
+		FOREACH_PlayerNumber( p )
+		{
+			m_NetworkProfileDisplay[p].Load( p );
+			m_NetworkProfileDisplay[p].SetName( ssprintf("NetworkProfileDisplayP%d", p + 1) );
+			SET_XY_AND_ON_COMMAND( m_NetworkProfileDisplay[p] );
+			this->AddChild( &m_NetworkProfileDisplay[p] );
+		}
+	}
 	
 	if( MEMORY_CARD_ICONS )
 	{
@@ -312,7 +324,10 @@ void ScreenWithMenuElements::TweenOffScreen()
 	ActorUtil::OffCommand( m_sprStyleIcon, m_sName );
 	OFF_COMMAND( m_sprStage[GAMESTATE->GetCurrentStage()] );
 	FOREACH_PlayerNumber( p )
+	{
 		ActorUtil::OffCommand( m_MemoryCardDisplay[p], m_sName );
+		ActorUtil::OffCommand( m_NetworkProfileDisplay[p], m_sName );
+	}
 	ActorUtil::OffCommand( m_autoFooter, m_sName );
 	ActorUtil::OffCommand( m_textHelp, m_sName );
 	OFF_COMMAND( m_sprUnderlay );

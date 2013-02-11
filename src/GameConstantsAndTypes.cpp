@@ -244,6 +244,15 @@ static const CString MemoryCardStateNames[] = {
 };
 XToString( MemoryCardState, NUM_MEMORY_CARD_STATES );
 
+static const CString NetworkPassStateNames[] = {
+	"absent",
+	"present",
+	"downloading",
+	"saving",
+	"ready"
+};
+XToString( NetworkPassState, NUM_NETWORK_PASS_STATES );
+
 
 static const CString PerDifficultyAwardNames[] = {
 	"FullComboGreats",
