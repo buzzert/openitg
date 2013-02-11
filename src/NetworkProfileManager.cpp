@@ -13,6 +13,7 @@
 #include "Preference.h"
 #include "RageThreads.h"
 #include "io/Genesis.h"
+#include "GameState.h"
 
 // libcurl
 #include <curl/curl.h>
@@ -20,6 +21,11 @@
 
 #include <queue>
 #include <sstream>
+
+#define PLAY_SOUND( sound ) \
+	RageSoundParams params; \
+	params.m_bIsCriticalSound = true; \
+	sound.Play( &params );
 
 static Preference<CString> g_sProfileServerURL( "ProfileServerURL", "10.0.1.39" );
 
@@ -100,7 +106,6 @@ namespace NetworkProfileManagerThreads {
 		PlayerBiscuit* DownloadPlayerBiscuit( NetworkPass *pass );
 		bool UploadProfile( Profile *profile, NetworkPass *pass );
 
-		CURL *m_pCurlHandle;
 		std::queue<NetworkingRequest> m_qPendingRequests;
 		std::queue<NetworkingRequest> m_qCompletedRequests;
 
@@ -130,15 +135,12 @@ namespace NetworkProfileManagerThreads {
 		PendingRequestsMutex( "PendingRequestsMutex" ),
 		CompletedRequestsMutex( "CompletedRequestsMutex" )
 	{
-		m_pCurlHandle = curl_easy_init();
-
 		SetHeartbeat( 0.1f );
 		StartThread();
 	}
 
 	NetworkingThread::~NetworkingThread()
 	{
-		curl_easy_cleanup( m_pCurlHandle );
 	}
 
 	void NetworkingThread::AddNetworkRequest( const NetworkingRequest &request )
@@ -175,20 +177,22 @@ namespace NetworkProfileManagerThreads {
 
 	PlayerBiscuit* NetworkingThread::DownloadPlayerBiscuit( NetworkPass *pass )
 	{
+		CURL *curlHandle = curl_easy_init();
+
 		std::stringstream ss;
 		ss << "http://" << g_sProfileServerURL.Get();
 		ss << "/smnetprof/get_stats.php?id=" << pass->m_sUniqueIdentifier;
 
 		CString resultString;
-		curl_easy_setopt( m_pCurlHandle, CURLOPT_WRITEFUNCTION, callback_write_data );
-		curl_easy_setopt( m_pCurlHandle, CURLOPT_WRITEDATA, &resultString );
+		curl_easy_setopt( curlHandle, CURLOPT_WRITEFUNCTION, callback_write_data );
+		curl_easy_setopt( curlHandle, CURLOPT_WRITEDATA, &resultString );
 
 		// NPMTODO: Checking, error handling
 		PlayerBiscuit *biscuit = new PlayerBiscuit;
 
 		// get stats
-		curl_easy_setopt( m_pCurlHandle, CURLOPT_URL, (ss.str() + "&type=stats").c_str() );
-		CURLcode success = curl_easy_perform( m_pCurlHandle );
+		curl_easy_setopt( curlHandle, CURLOPT_URL, (ss.str() + "&type=stats").c_str() );
+		CURLcode success = curl_easy_perform( curlHandle );
 
 		// parse stats
 		XNode *statsXML = new XNode();
@@ -199,17 +203,14 @@ namespace NetworkProfileManagerThreads {
 
 		// get editable
 		resultString = "";
-		curl_easy_setopt( m_pCurlHandle, CURLOPT_URL, (ss.str() + "&type=editable").c_str() );
-		success = curl_easy_perform( m_pCurlHandle );
+		curl_easy_setopt( curlHandle, CURLOPT_URL, (ss.str() + "&type=editable").c_str() );
+		success = curl_easy_perform( curlHandle );
 
 		// parse editable
 		XNode *editableXML = new XNode();
 		editableXML->Load( resultString, &pi );
 
 		biscuit->editableNode = editableXML;
-
-		// FOR TESTING INTERFACE
-		sleep( 2 );
 
 		return biscuit;
 	}
@@ -228,6 +229,7 @@ namespace NetworkProfileManagerThreads {
 		struct curl_slist *headerList = NULL;
 		static const char buf[] = "Expect:";
 
+		CURL *curlHandle = curl_easy_init();
 		curl_global_init( CURL_GLOBAL_ALL );
 
 		curl_formadd( &formPost,
@@ -246,11 +248,11 @@ namespace NetworkProfileManagerThreads {
 		);
 
 		headerList = curl_slist_append( headerList, buf );
-		curl_easy_setopt( m_pCurlHandle, CURLOPT_URL, ss.str().c_str() );
-		curl_easy_setopt( m_pCurlHandle, CURLOPT_HTTPHEADER, headerList );
-		curl_easy_setopt( m_pCurlHandle, CURLOPT_HTTPPOST, formPost );
+		curl_easy_setopt( curlHandle, CURLOPT_URL, ss.str().c_str() );
+		curl_easy_setopt( curlHandle, CURLOPT_HTTPHEADER, headerList );
+		curl_easy_setopt( curlHandle, CURLOPT_HTTPPOST, formPost );
 
-		CURLcode result = curl_easy_perform( m_pCurlHandle );
+		CURLcode result = curl_easy_perform( curlHandle );
 		if( result != CURLE_OK )
 		{
 			LOG->Warn("NETPROFMAN ERROR: uploading profile %s", curl_easy_strerror( result ));
@@ -259,9 +261,6 @@ namespace NetworkProfileManagerThreads {
 		curl_formfree( formPost );
 		curl_slist_free_all( headerList );
 
-		// FOR TESTING INTERFACE
-		sleep( 2 );
-      
 		return result == CURLE_OK;
 	}
 
@@ -331,6 +330,7 @@ namespace NetworkProfileManagerThreads {
 		NetworkPass *newPass = NULL;
 		while ( m_pDriver->Read( &pDataIn ) ) {
 			CString passString = CString( pDataIn );
+			free( pDataIn );
 
 			LOG->Info( "*** GenesisInput: got new pass: %s", passString.c_str() );
 
@@ -359,6 +359,30 @@ NetworkProfileManager::NetworkProfileManager()
 	m_soundDisconnect.Load( THEME->GetPathS("MemoryCardManager", "disconnect"), true );
 	m_soundScanned.Load( THEME->GetPathS("NetworkProfileManager", "scanned"), true );
 	m_soundSaved.Load( THEME->GetPathS("NetworkProfileManager", "saved"), true );
+	m_soundTooLate.Load( THEME->GetPathS("MemoryCardManager","too late"), true );
+}
+
+bool NetworkProfileManager::AssociateNetworkPass( PlayerNumber pn, NetworkPass *pass )
+{
+	if ( m_Passes[pn] != NULL )
+		return false;
+
+	m_State[pn] = NETWORK_PASS_PRESENT;
+	m_Passes[pn] = pass;
+	return true;
+}
+
+bool NetworkProfileManager::DisassociateNetworkPass( PlayerNumber pn )
+{
+	m_State[pn] = NETWORK_PASS_ABSENT;
+
+	delete m_Passes[pn];
+	m_Passes[pn] = NULL;
+
+	delete m_DownloadedBiscuits[pn];
+	m_DownloadedBiscuits[pn] = NULL;
+
+	return true;
 }
 
 void NetworkProfileManager::ProcessNetworkPasses()
@@ -366,27 +390,52 @@ void NetworkProfileManager::ProcessNetworkPasses()
 	if ( !m_pInputHandler->m_bPassesChanged )
 		return;
 
-	NPMLog( "got pass from inputhandler" );
+	NPMLog( "got pass from genesis reader" );
+
+	m_pInputHandler->m_bPassesChanged = false;
+
+	if ( !GAMESTATE->PlayersCanJoin() )
+	{
+		// too late. throw away the pass
+		PLAY_SOUND( m_soundTooLate );
+		m_pInputHandler->m_qPassQueue.pop();
+
+		return;
+	}
 
 	while ( !m_pInputHandler->m_qPassQueue.empty() )
 	{
 		NetworkPass *newPass = m_pInputHandler->m_qPassQueue.front();
 		m_pInputHandler->m_qPassQueue.pop();
 
+		bool passAlreadyScanned = false;
+		FOREACH_PlayerNumber( pn )
+		{
+			if ( m_Passes[pn] && *(m_Passes[pn]) == (*newPass) )
+			{
+				passAlreadyScanned = true;
+				break;
+			}
+		}
+
+		if ( passAlreadyScanned )
+		{
+			PLAY_SOUND( m_soundTooLate );
+			break;
+		}
+
 		// Place pass into the first empty slot.
 		FOREACH_PlayerNumber( p )
 		{
 			if ( m_Passes[p] == NULL )
 			{
-				m_Passes[p] = newPass;
+				AssociateNetworkPass( p, newPass );
 
 				// Start downloading profile
 				NetworkingRequest request( NetRequestTypeDownloadBiscuit, p, newPass );
 				m_pNetworkThread->AddNetworkRequest( request );
 
-				RageSoundParams params;
-				params.m_bIsCriticalSound = true;
-				m_soundScanned.Play( &params );
+				PLAY_SOUND( m_soundScanned );
 
 				m_State[p] = NETWORK_PASS_DOWNLOADING;
 				SCREENMAN->RefreshCreditsMessages();
@@ -394,8 +443,6 @@ void NetworkProfileManager::ProcessNetworkPasses()
 			}
 		}
 	}
-
-	m_pInputHandler->m_bPassesChanged = false;
 }
 
 void NetworkProfileManager::ProcessPendingProfiles()
@@ -417,9 +464,7 @@ void NetworkProfileManager::ProcessPendingProfiles()
 
 				SCREENMAN->RefreshCreditsMessages();
 
-				RageSoundParams params;
-				params.m_bIsCriticalSound = true;
-				m_soundReady.Play( &params );
+				PLAY_SOUND( m_soundReady );
 
 				// do some credits stuff here soon!
 				SCREENMAN->SystemMessage( "Welcome buzzert! Balance remaining: $12.50" );
@@ -428,13 +473,10 @@ void NetworkProfileManager::ProcessPendingProfiles()
 			}
 			else if ( request.GetRequestType() == NetRequestTypeUploadProfile )
 			{
-				RageSoundParams params;
-				params.m_bIsCriticalSound = true;
-				m_soundSaved.Play( &params );
+				PLAY_SOUND( m_soundSaved );
 
 				PlayerNumber pn = request.GetPlayerNumber();
-
-				m_State[pn] = NETWORK_PASS_READY;
+				DisassociateNetworkPass( pn );
 				SCREENMAN->RefreshCreditsMessages();
 			}
 		}
@@ -509,8 +551,6 @@ bool NetworkProfileManager::SaveProfileForPlayerNumber( PlayerNumber pn, const P
 
 	m_State[pn] = NETWORK_PASS_SAVING;
 	SCREENMAN->RefreshCreditsMessages();
-
-	// NPMTODO: disconnect or update profile after a short interval...
 
 	return true; // NPMTODO: error handling
 }

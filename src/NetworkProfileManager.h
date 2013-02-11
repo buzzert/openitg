@@ -22,6 +22,8 @@ class NetworkPass
 public:
 	NetworkPass( CString sUniqueIdentifier ) : m_sUniqueIdentifier( sUniqueIdentifier ) {};
 	CString m_sUniqueIdentifier;
+
+	bool operator==(const NetworkPass &otherPass) { return m_sUniqueIdentifier == otherPass.m_sUniqueIdentifier; };
 };
 
 class NetworkProfileManager
@@ -42,6 +44,9 @@ protected:
 	void ProcessNetworkPasses();
 	void ProcessPendingProfiles();
 
+	bool AssociateNetworkPass( PlayerNumber pn, NetworkPass *pass );
+	bool DisassociateNetworkPass( PlayerNumber pn );
+
 	// Threads
 	NetworkProfileManagerThreads::NetworkingThread *m_pNetworkThread;
 	NetworkProfileManagerThreads::GenesisInputHandlerThread *m_pInputHandler;
@@ -55,6 +60,7 @@ private:
 	RageSound m_soundDisconnect;
 	RageSound m_soundScanned;
 	RageSound m_soundSaved;
+	RageSound m_soundTooLate;
 };
 
 extern NetworkProfileManager* NETPROFMAN;

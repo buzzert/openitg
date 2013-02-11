@@ -35,7 +35,7 @@ void NetworkProfileDisplay::Update( float fDelta )
 	NetworkPassState newNps = NETPROFMAN->GetPassState( m_PlayerNumber );
 	if( m_LastSeenState != newNps )
 	{
-		if( m_LastSeenState != NETWORK_PASS_INVALID && newNps != NETWORK_PASS_SAVING )
+		if( m_LastSeenState != NETWORK_PASS_INVALID )
 			m_Sprites[m_LastSeenState].SetHidden( true );
 
 		m_LastSeenState = newNps;

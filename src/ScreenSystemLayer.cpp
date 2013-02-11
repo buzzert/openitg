@@ -158,9 +158,6 @@ CString ScreenSystemLayer::GetCreditsMessage( PlayerNumber pn ) const
 	else 
 		bShowCreditsMessage = !GAMESTATE->m_bSideIsJoined[pn];
 
-	if ( NETPROFMAN->GetPassState( pn ) == NETWORK_PASS_SAVING )
-		bShowCreditsMessage = true;
-		
 	if( !bShowCreditsMessage )
 	{
 		NetworkPassState nps = NETPROFMAN->GetPassState( pn );
