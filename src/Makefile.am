@@ -198,7 +198,9 @@ InputHandler += arch/InputHandler/InputHandler_PIUIO.h \
 		arch/InputHandler/InputHandler_MK3.cpp \
 		arch/InputHandler/InputHandler_MK3Helper.h \
 		arch/InputHandler/InputHandler_MiniMaid.h \
-		arch/InputHandler/InputHandler_MiniMaid.cpp
+		arch/InputHandler/InputHandler_MiniMaid.cpp \
+		arch/InputHandler/InputHandler_RemoteControl.h \
+		arch/InputHandler/InputHandler_RemoteControl.cpp
 
 
 
