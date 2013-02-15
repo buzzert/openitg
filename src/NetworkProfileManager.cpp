@@ -95,6 +95,7 @@ namespace NetworkProfileManagerThreads {
 		NetworkingThread();
 		~NetworkingThread();
 
+		bool m_bShouldStop;
 		void AddNetworkRequest( const NetworkingRequest &request );
 		bool GetCompletedNetworkRequests( std::queue<NetworkingRequest> &aOut );
 		
@@ -105,7 +106,7 @@ namespace NetworkProfileManagerThreads {
 	private:
 		PlayerBiscuit* DownloadPlayerBiscuit( NetworkPass *pass );
 		bool UploadProfile( Profile *profile, NetworkPass *pass );
-
+		
 		std::queue<NetworkingRequest> m_qPendingRequests;
 		std::queue<NetworkingRequest> m_qCompletedRequests;
 
@@ -119,6 +120,7 @@ namespace NetworkProfileManagerThreads {
 	public:
 		GenesisInputHandlerThread();
 
+		bool m_bShouldStop;
 		bool m_bPassesChanged;
 		queue<NetworkPass *> m_qPassQueue;
 
@@ -133,6 +135,7 @@ namespace NetworkProfileManagerThreads {
 
 	NetworkingThread::NetworkingThread() :
 		RageWorkerThread( "NPM-NetworkingWorkerThread" ),
+		m_bShouldStop( false ),
 		PendingRequestsMutex( "PendingRequestsMutex" ),
 		CompletedRequestsMutex( "CompletedRequestsMutex" )
 	{
@@ -310,7 +313,8 @@ namespace NetworkProfileManagerThreads {
 	/*** Genesis Input Handler ***/
 
 	GenesisInputHandlerThread::GenesisInputHandlerThread() :
-		RageWorkerThread( "GenesisInputHandlerThread" )
+		RageWorkerThread( "GenesisInputHandlerThread" ),
+		m_bShouldStop( false )
 	{
 		m_bPassesChanged = false;
 
@@ -338,7 +342,7 @@ namespace NetworkProfileManagerThreads {
 	{
 		char *pDataIn;
 		NetworkPass *newPass = NULL;
-		while ( true ) {
+		while ( true && !m_bShouldStop ) {
 			while ( !m_pDriver->Read( &pDataIn ) )
 				Reconnect();
 
@@ -373,6 +377,25 @@ NetworkProfileManager::NetworkProfileManager()
 	m_soundScanned.Load( THEME->GetPathS("NetworkProfileManager", "scanned"), true );
 	m_soundSaved.Load( THEME->GetPathS("NetworkProfileManager", "saved"), true );
 	m_soundTooLate.Load( THEME->GetPathS("MemoryCardManager","too late"), true );
+}
+
+NetworkProfileManager::~NetworkProfileManager()
+{
+	delete m_DownloadedBiscuits;
+	delete m_Passes;
+
+	if ( m_pNetworkThread )
+	{
+		m_pNetworkThread->m_bShouldStop = true;
+		m_pNetworkThread->WaitForOneHeartbeat();
+	}
+
+	if ( m_pInputHandler )
+	{
+		m_pInputHandler->m_bShouldStop = true;
+		m_pInputHandler->WaitForOneHeartbeat();
+	}
+	
 }
 
 bool NetworkProfileManager::AssociateNetworkPass( PlayerNumber pn, NetworkPass *pass )
@@ -438,9 +461,10 @@ void NetworkProfileManager::ProcessNetworkPasses()
 		}
 
 		// Place pass into the first empty slot.
+		bool passWasPlaced = false;
 		FOREACH_PlayerNumber( p )
 		{
-			if ( m_Passes[p] == NULL )
+			if ( m_Passes[p] == NULL && GAMESTATE->IsPlayerEnabled( p ) )
 			{
 				AssociateNetworkPass( p, newPass );
 
@@ -452,8 +476,16 @@ void NetworkProfileManager::ProcessNetworkPasses()
 
 				m_State[p] = NETWORK_PASS_DOWNLOADING;
 				SCREENMAN->RefreshCreditsMessages();
+
+				passWasPlaced = true;
 				break;
 			}
+		}
+
+		if ( !passWasPlaced )
+		{
+			// Either too many players, no players joined, or it's not the right time.
+			PLAY_SOUND( m_soundTooLate );
 		}
 	}
 }
@@ -480,7 +512,7 @@ void NetworkProfileManager::ProcessPendingProfiles()
 				PLAY_SOUND( m_soundReady );
 
 				// do some credits stuff here soon!
-				SCREENMAN->SystemMessage( "Welcome buzzert! Balance remaining: $12.50" );
+				SCREENMAN->SystemMessage( ("Welcome " + GetProfileDisplayString( pn ) + "!") );
 
 				NPMLog( "Biscuit was downloaded" );
 			}
