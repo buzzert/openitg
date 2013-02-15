@@ -93,6 +93,7 @@ bool GenesisScanner::Read( char **pData )
 		else if ( iResult < 0 )
 		{
 			LOG->Warn("GENESIS IO ERROR (%d)!", iResult);
+			break;
 		}
 	}
 

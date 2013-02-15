@@ -123,6 +123,7 @@ namespace NetworkProfileManagerThreads {
 		queue<NetworkPass *> m_qPassQueue;
 
 	protected:
+		void Reconnect();
 		void DoHeartbeat();
 		void HandleRequest( int iRequest ) {};
 
@@ -324,11 +325,23 @@ namespace NetworkProfileManagerThreads {
 		StartThread();
 	}
 
+	void GenesisInputHandlerThread::Reconnect()
+	{
+		while ( !m_pDriver->Open() )
+		{
+			m_pDriver->Close();
+			usleep( 1000 );
+		}
+	}
+
 	void GenesisInputHandlerThread::DoHeartbeat()
 	{
 		char *pDataIn;
 		NetworkPass *newPass = NULL;
-		while ( m_pDriver->Read( &pDataIn ) ) {
+		while ( true ) {
+			while ( !m_pDriver->Read( &pDataIn ) )
+				Reconnect();
+
 			CString passString = CString( pDataIn );
 			free( pDataIn );
 
