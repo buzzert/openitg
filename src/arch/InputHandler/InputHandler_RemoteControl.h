@@ -4,23 +4,7 @@
 #include "InputHandler.h"
 #include "RageThreads.h"
 #include "RageTimer.h"
-
-typedef enum {
-	P1_MENULEFT = 0,
-	P1_MENURIGHT,
-	P1_SELECT,
-
-	P2_MENULEFT,
-	P2_MENURIGHT,
-	P2_SELECT,
-
-	NUM_BUTTONS
-} ButtonIdentifier;
-
-typedef struct {
-	ButtonIdentifier bi;
-	bool state;
-} button_packet_t;
+#include "arch/InputHandler/RCCommandPacket.h"
 
 static const int SERVER_PORT = 3355;
 
@@ -40,7 +24,7 @@ private:
 
 	RageThread InputThread;
 
-	button_packet_t *lastPacket;
+	command_packet_t *lastPacket;
 
 	bool StartServer();
 

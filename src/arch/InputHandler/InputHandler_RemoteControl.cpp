@@ -66,7 +66,7 @@ bool InputHandler_RemoteControl::StartServer()
 	m_fdClientSocket = accept(m_fdListeningSocket, (struct sockaddr *)&clientAddress, &clientAddressSize);
 	LOG->Info("**** CONNECTED!");
 
-	lastPacket = (button_packet_t *)calloc( sizeof(button_packet_t), 1 );
+	lastPacket = (command_packet_t *)calloc( sizeof(command_packet_t), 1 );
 
 	return true;
 }
@@ -79,7 +79,7 @@ void InputHandler_RemoteControl::GetDevicesAndDescriptions( vector<InputDevice>&
 
 void InputHandler_RemoteControl::HandleInput()
 {
-	int iBytesRead = read( m_fdClientSocket, lastPacket, sizeof( button_packet_t ) );
+	int iBytesRead = read( m_fdClientSocket, lastPacket, sizeof( command_packet_t ) );
 	if ( iBytesRead <= 0 )
 	{
 		LOG->Warn( "Client was disconnected" );
@@ -89,12 +89,16 @@ void InputHandler_RemoteControl::HandleInput()
 		StartServer();
 		return;
 	}
-	
-	RageTimer now;
-	DeviceInput deviceInput( DEVICE_INPUTDEVICE, JOY_1 + lastPacket->bi );
-	deviceInput.ts = now;
 
-	ButtonPressed( deviceInput, lastPacket->state );
+	if ( lastPacket->type == CommandTypeButton ) {
+		button_command_t buttonCommand = lastPacket->buttonCommand;
+
+		RageTimer now;
+		DeviceInput deviceInput( DEVICE_INPUTDEVICE, JOY_1 + buttonCommand.bi );
+		deviceInput.ts = now;
+
+		ButtonPressed( deviceInput, buttonCommand.state );
+	}
 }
 
 int InputHandler_RemoteControl::InputThreadMain()
