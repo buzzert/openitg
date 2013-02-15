@@ -31,11 +31,11 @@ InputHandler_RemoteControl::~InputHandler_RemoteControl()
 	if ( InputThread.IsCreated() )
 	{
 		m_bShouldStop = true;
+		shutdown(m_fdClientSocket, SHUT_RDWR);
+		shutdown(m_fdListeningSocket, SHUT_RDWR);
+
 		InputThread.Wait();
 	}
-
-	close(m_fdClientSocket);
-	close(m_fdListeningSocket);
 }
 
 bool InputHandler_RemoteControl::StartServer()
